@@ -46,9 +46,9 @@
     </div>
     <div style="width:800px; position:absolute; height:30px; left:0px; bottom:10px; line-height:30px; font-size:15px; color:#DDDDDD; text-align:center;">TAI KWAN TECHNOLOGY CO., LTD.</div>
 </div>
-<script src="http://libs.baidu.com/jquery/2.0.0/jquery.js"></script>
+<script src="static/jquery.1.7.0.min.js"></script>
 <script type="text/javascript">
-$(function(){
+$(document).ready(function(){
     $('#reboot').on('click', function(){
 	if (confirm("Are you sure to reboot?")){
 	    $.get('/reboot');
@@ -82,7 +82,7 @@ $(function(){
     });
     /*
     $('#add').on('click', function() {
-        let i = $('#areas>li').length;
+        var i = $('#areas>li').length;
 	$('#areas').append("<li id='area" + i + "'><input type='text' style='width:280px;'><!--button id='del" + i + "'>delete</button--></li>");
         $('#del'+i).on('click', function() {
             $('#area'+i).remove();
@@ -90,7 +90,7 @@ $(function(){
     });
     */
     $('#motion_submit').on('click', function() {
-        let data = getMotionData();
+        var data = getMotionData();
         if (data.length === 0) { return; }
         console.log('data: ' + JSON.stringify(data));
         if (data.length > 0) {
@@ -111,7 +111,7 @@ $(function(){
         }
     });
     $('#lux_submit').on('click', function() {
-        let data = getLuxData();
+        var data = getLuxData();
         if (data.length === 0) { return; }
         console.log('data: ' + JSON.stringify(data));
         if (data.length > 0) {
@@ -135,12 +135,12 @@ $(function(){
     getLuxConfig();
 });
 function getMotionData() {
-    let inputs = $('#motion_areas>li>input');
-    let data = [];
-    for (let i = 0; i < inputs.length; i++) {
-        let input = inputs[i];
+    var inputs = $('#motion_areas>li>input');
+    var data = [];
+    for (var i = 0; i < inputs.length; i++) {
+        var input = inputs[i];
         try {
-            let item = JSON.parse('[' + input.value + ']');
+            var item = JSON.parse('[' + input.value + ']');
             if (checkItem(item)) {
                 data.push(item);
             } else {
@@ -155,12 +155,12 @@ function getMotionData() {
     return data;
 }
 function getLuxData() {
-    let inputs = $('#lux_areas>li>input');
-    let data = [];
-    for (let i = 0; i < inputs.length; i++) {
-        let input = inputs[i];
+    var inputs = $('#lux_areas>li>input');
+    var data = [];
+    for (var i = 0; i < inputs.length; i++) {
+        var input = inputs[i];
         try {
-            let item = JSON.parse('[' + input.value + ']');
+            var item = JSON.parse('[' + input.value + ']');
             if (checkItem(item)) {
                 data.push(item);
             } else {
@@ -177,8 +177,8 @@ function getLuxData() {
 function getMotionConfig() {
     $.get('/motion_config', function(data) {
         $('#motion_areas').empty();
-        for (let i in data) {
-            let item = data[i];
+        for (var i in data) {
+            var item = data[i];
 	    $('#motion_areas').append("<li id='motion_area" + i + "'><input type='text' value='" + item + "' style='width:280px;'><!--button id='del" + i + "'>delete</button--></li>");
 	    /*
             $('#del'+i).on('click', function() {
@@ -192,8 +192,8 @@ function getMotionConfig() {
 function getLuxConfig() {
     $.get('/lux_config', function(data) {
         $('#lux_areas').empty();
-        for (let i in data) {
-            let item = data[i];
+        for (var i in data) {
+            var item = data[i];
 	    $('#lux_areas').append("<li id='lux_area" + i + "'><input type='text' value='" + item + "' style='width:280px;'><!--button id='del" + i + "'>delete</button--></li>");
 	    /*
             $('#del'+i).on('click', function() {
@@ -216,9 +216,9 @@ function draw_motion() {
     var img = new Image();
     img.onload = function() { 
         ctx.drawImage(img, 0, 0); 
-        let data = getMotionData();
+        var data = getMotionData();
 	var order=1;
-        for (let item of data) {
+        for (var item in data) {
             ctx.beginPath();
             ctx.rect(item[0], item[1], item[2] - item[0], item[3] - item[1]);
             ctx.lineWidth = 4;
@@ -241,9 +241,9 @@ function draw_lux() {
     var img = new Image();
     img.onload = function() { 
         ctx.drawImage(img, 0, 0); 
-        let data = getLuxData();
+        var data = getLuxData();
 	var order=1;
-        for (let item of data) {
+        for (var item in data) {
             ctx.beginPath();
             ctx.rect(item[0], item[1], item[2] - item[0], item[3] - item[1]);
             ctx.lineWidth = 4;
