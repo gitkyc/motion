@@ -218,7 +218,8 @@ function draw_motion() {
         ctx.drawImage(img, 0, 0); 
         var data = getMotionData();
 	var order=1;
-        for (var item in data) {
+        for (var i in data) {
+	    var item=data[i];
             ctx.beginPath();
             ctx.rect(item[0], item[1], item[2] - item[0], item[3] - item[1]);
             ctx.lineWidth = 4;
@@ -243,7 +244,8 @@ function draw_lux() {
         ctx.drawImage(img, 0, 0); 
         var data = getLuxData();
 	var order=1;
-        for (var item in data) {
+        for (var i in data) {
+	    var item=data[i];
             ctx.beginPath();
             ctx.rect(item[0], item[1], item[2] - item[0], item[3] - item[1]);
             ctx.lineWidth = 4;
