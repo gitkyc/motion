@@ -117,11 +117,10 @@ def main():
             time.sleep(1)
             continue
         data = np.empty((width, height), dtype=np.uint8)
-        print(type(data))
         try:
             frame=camera.get_frame()
             img=Image.frombytes('RGB', (camera.width, camera.height), frame, 'raw', 'RGB').resize((width,height))
-            img_yuv=img.convert('YCbCr')
+            img_yuv=img.convert('L')
             data=np.array(img_yuv)
         except IOError as e:
             print(str(e))

@@ -7,7 +7,7 @@ import subprocess
 
 
 input_path = '/home/pi/motion/fifo'
-serial_dev = '/dev/ttyAMA0'
+serial_dev = '/dev/ttyS0'
 #input_path = '/tmp/fifo'
 #serial_dev = '/dev/tty.usbserial-1410'
 
@@ -93,7 +93,7 @@ def send_data(data, s):
     out = bytearray([0xfa, 0x01, motion, 0x0f, 0, 0, 0, 0, 0, 0])
     if "light" in data:
         for k, v in data['light'].items():
-            out[4+int(k)] = v
+            out[4+int(k)] = (v&0xFF)
     if hostapd_is_opened:
         out[8]=0x0a
     else:
