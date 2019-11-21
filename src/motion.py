@@ -6,6 +6,9 @@ import os
 from flask import Flask, render_template, request, jsonify
 import threading
 import subprocess
+from PIL import Image
+from PyV4L2Camera.camera import Camera
+from PyV4L2Camera.controls import ControlIDs
 
 width = 64 * 2
 height = 48 * 2
@@ -26,8 +29,8 @@ lux_rects = np.divide(lux_targets, ratio * 320 / width).astype(int)
 snapping = False
 
 # camera
-camera = PiCamera()
-camera.start_preview()
+camera=Camera('/dev/video0', 320, 240)
+# controls=camera.get_controls()
 # Camera warm-up time
 time.sleep(2)
 
@@ -114,9 +117,14 @@ def main():
             time.sleep(1)
             continue
         data = np.empty((width, height), dtype=np.uint8)
+        print(type(data))
         try:
-            camera.capture(data, format='yuv', resize=(width, height))
+            frame=camera.get_frame()
+            img=Image.frombytes('RGB', (camera.width, camera.height), frame, 'raw', 'RGB').resize((width,height))
+            img_yuv=img.convert('YCbCr')
+            data=np.array(img_yuv)
         except IOError as e:
+            print(str(e))
             pass
         # for i in range(height):
         #     print(' '.join('{:3d}'.format(x) for x in data[i * width: (i+1) * width]))
@@ -132,18 +140,20 @@ def main():
         #     snap()
 
         try:
-            time.sleep(0.1)
+            time.sleep(0.2)
         except KeyboardInterrupt:
             break
     print("main loop finished")
+
 
 
 def snap():
     global snapping
     snapping = True
     time.sleep(2)
-    with open(image_path, 'wb+') as file:
-        camera.capture(file, resize=(320, 240))
+    frame=camera.get_frame()
+    img=Image.frombytes('RGB', (camera.width, camera.height), frame, 'raw', 'RGB').resize((320,240))
+    img.save(image_path)
     snapping = False
 
 
