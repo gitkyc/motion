@@ -18,6 +18,8 @@ HOSTAPD_STATUS_QUERY_MAX_INTERVAL_SEC = 10
 
 hostapd_is_opened=False
 hostapd_status_query_hold_sec = 0
+last_motion={}
+last_write_serial_time=time.perf_counter()
 
 def main():
     global hostapd_status_query_hold_sec
@@ -40,7 +42,7 @@ def main():
                 send_hostapd_status_data(s)
                 hostapd_status_query_hold_sec=0
             try:
-                time.sleep(1)
+                time.sleep(0.2)
                 continue
             except KeyboardInterrupt:
                 break
@@ -86,6 +88,8 @@ def handle_serial_in(proto):
 def send_data(data, s):
     # data like { "motion": [ 1, 2, 4], "light": [2, 6] }
     global hostapd_is_opened
+    global last_motion
+    global last_write_serial_time
     print("send data: {}".format(json.dumps(data)))
     motion = 0
     if "motion" in data:
@@ -101,8 +105,12 @@ def send_data(data, s):
     crc = crc_bytes(0x07, out)
     out.append(crc)
     print(', '.join('0x{:02x}'.format(x) for x in out))
-    s.write(out)
-    s.flush()
+    current_time=time.perf_counter()
+    if((last_motion != motion) or (current_time-last_write_serial_time > 10)):
+        s.write(out)
+        s.flush()
+        last_motion=motion
+        last_write_serial_time=current_time
 
 def send_hostapd_status_data(s):
     global hostapd_is_opened
