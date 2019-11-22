@@ -201,6 +201,7 @@ def judge_motion(last, current):
         print(submatrix)
         current_trigger_time=time.perf_counter()
         if (np.sum(submatrix) > 0) and (current_trigger_time-last_trigger_times[i]>=5):
+            last_trigger_times[i]=current_trigger_time
             res.append(i)
 
     if len(res) > 0:
