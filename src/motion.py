@@ -34,6 +34,8 @@ camera=Camera('/dev/video0', 320, 240)
 # Camera warm-up time
 time.sleep(2)
 
+last_trigger_times=[0,0,0,0]
+
 # flask
 app = Flask(__name__)
 
@@ -139,7 +141,7 @@ def main():
         #     snap()
 
         try:
-            time.sleep(0.2)
+            time.sleep(0.1)
         except KeyboardInterrupt:
             break
     print("main loop finished")
@@ -197,7 +199,8 @@ def judge_motion(last, current):
         rect = motion_rects[i]
         submatrix = diff[rect[1]:rect[3], rect[0]:rect[2]]
         print(submatrix)
-        if np.sum(submatrix) > 0:
+        current_trigger_time=time.perf_counter()
+        if (np.sum(submatrix) > 0) and (current_trigger_time-last_trigger_times[i]>=5):
             res.append(i)
 
     if len(res) > 0:
