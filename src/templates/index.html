@@ -5,7 +5,7 @@
     <title>Configuration</title>
 </head>
 <body style="color:#666666; width:100%; height:100%;">
-<div style="position:absolute; width:780px; height: 770px; left:50%; top:50%; margin-left:-400px; top:40px; backgroun-color: #EEEEEE; border-radius:5px; box-shadow: 2px 2px 10px #888888;">
+<div style="position:absolute; width:780px; height: 840px; left:50%; top:50%; margin-left:-400px; top:40px; backgroun-color: #EEEEEE; border-radius:5px; box-shadow: 2px 2px 10px #888888;">
     <div style="background-color:#DDDDDD; border-bottom:1px solid #DDDDDD; height:60px; position:absolute; left:0px; right:0px; top:0px; text-align:center; border-top-left-radius:5px; border-top-right-radius:5px;">
         <span style="font-size:20px; line-height:60px;">Motion-Lux Camera Configuration</span>
     </div>
@@ -38,6 +38,10 @@
         <button id="lux_show" style="width:160px; height:40px; color:#666666; float:right; margin-left: 5px;">Show Area in Snap</button>
         <!--button id="add">Add Area</button-->
         <button id="lux_submit" style="width:150px; height:40px; color:#666666; float:right;">Save Area</button>
+    </fieldset>
+    <fieldset style="position:absolute; height:50px; right:20px; left:20px; top:650px; border:1px solid #DDDDDD; border-radius:5px;">
+        <legend style="font-size:15px; color:#AA0000;">Advance Settings</legend>
+        <span>Gauss Filter Radius:<span><input id="gauss_filter_radius_input" type="text" value="1" style="width:80px; height:25px;"> <button id="gauss_submit" style="width:80px; height:30px; color:#666666;">Save</button>
     </fieldset>
     <hr style="position:absolute; height:0px; left: 20px; right:20px; bottom:100px;"/>
     <div style="width:800px; position:absolute; height:50px; left:0px; bottom:40px; font-size:15px; color:#DDDDDD; text-align:center;">
@@ -90,25 +94,50 @@ $(document).ready(function(){
     });
     */
     $('#motion_submit').on('click', function() {
-        var data = getMotionData();
-        if (data.length === 0) { return; }
-        console.log('data: ' + JSON.stringify(data));
-        if (data.length > 0) {
-            $.ajax({
-                type: 'POST',
-                url: '/motion_config', 
-                data: JSON.stringify(data), 
-                success: function() {
-                    alert('submit success');
-                    getMotionConfig();
-                }, 
-                error: function(e) {
-                    alert('submit failed: ' + e.message);
-                    getMotionConfig();
-                }, 
-                contentType: 'application/json'
-            });
-        }
+        var areaData = getMotionAreaData();
+        if (areaData.length === 0) { return; }
+        var thresholdData = getMotionThresholdData();
+        if (thresholdData.length === 0) { return; }
+        console.log('motion area data: ' + JSON.stringify(areaData) + ', motion threshold data: ' + JSON.stringify(thresholdData));
+        var data={};
+        data["areas"]=areaData;
+        data["thresholds"]=thresholdData;
+        console.log("motion data:"+JSON.stringify(data));
+        $.ajax({
+            type: 'POST',
+            url: '/motion_config', 
+            data: JSON.stringify(data), 
+            success: function() {
+                alert('submit success');
+                getMotionConfig();
+            }, 
+            error: function(e) {
+                alert('submit failed: ' + e.message);
+                getMotionConfig();
+            }, 
+            contentType: 'application/json'
+        });
+    });
+    $('#gauss_submit').on('click', function(){
+        var gaussRadius=$('#gauss_filter_radius_input').val();
+        console.log("radius="+gaussRadius);
+        var data={};
+        data["radius"]=gaussRadius;
+        $.ajax({
+            type: 'POST',
+            url: '/gauss_filter_config', 
+            data: JSON.stringify(data), 
+            success: function() {
+                alert('submit success');
+                getGaussConfig();
+            }, 
+            error: function(e) {
+                alert('submit failed: ' + e.message);
+                getGaussConfig();
+            }, 
+            contentType: 'application/json'
+        });
+        
     });
     $('#lux_submit').on('click', function() {
         var data = getLuxData();
@@ -133,15 +162,36 @@ $(document).ready(function(){
     });
     getMotionConfig();
     getLuxConfig();
+    getGaussConfig();
 });
-function getMotionData() {
-    var inputs = $('#motion_areas>li>input');
+function getMotionAreaData() {
+    var inputs = $('.motion_area_input');
     var data = [];
     for (var i = 0; i < inputs.length; i++) {
         var input = inputs[i];
         try {
             var item = JSON.parse('[' + input.value + ']');
             if (checkItem(item)) {
+                data.push(item);
+            } else {
+                alert('invalid format: ' + JSON.stringify(item));
+                return [];
+            }
+        } catch (e) {
+            alert('invalid format: ' + input.value);
+            return [];
+        }
+    }
+    return data;
+}
+function getMotionThresholdData() {
+    var inputs = $('.motion_threshold_input');
+    var data = [];
+    for (var i = 0; i < inputs.length; i++) {
+        var input = inputs[i];
+        try {
+            var item = Number(input.value);
+            if(item>=0 && item<=1000){
                 data.push(item);
             } else {
                 alert('invalid format: ' + JSON.stringify(item));
@@ -177,9 +227,12 @@ function getLuxData() {
 function getMotionConfig() {
     $.get('/motion_config', function(data) {
         $('#motion_areas').empty();
-        for (var i in data) {
-            var item = data[i];
-	    $('#motion_areas').append("<li id='motion_area" + i + "'><input type='text' value='" + item + "' style='width:280px;'><!--button id='del" + i + "'>delete</button--></li>");
+        var areas=data['areas']
+        var thresholds=data['thresholds']
+        for (var i=0; i<4; i++) {
+            var areaItem = areas[i];
+            var thresholdItem = thresholds[i];
+	    $('#motion_areas').append("<li id='motion_area" + i + "'>Area:<input class='motion_area_input' type='text' value='" + areaItem + "' style='width:110px;'>&nbsp;&nbsp;Threshold:<input class='motion_threshold_input' type='text' value='"+thresholdItem+"' style='width:30px;'></li>");
 	    /*
             $('#del'+i).on('click', function() {
                 $('#area'+i).remove();
@@ -204,10 +257,17 @@ function getLuxConfig() {
         draw_lux();
     });
 }
+function getGaussConfig(){
+    $.get('/gauss_filter_config', function(data) {
+        $('#gauss_filter_radius_input').val(data['radius']+"");
+    });
+}
 function checkItem(item) {
     if (item.length !== 4) { return false; }
     if (isNaN(item[0]) || isNaN(item[1]) || isNaN(item[2]) || isNaN(item[3])) { return false; }
-    if (item[0] > item[2] || item[1] > item[3]) { return false; }
+    if (item[0] >= item[2] || item[1] >= item[3]) { return false; }
+    if (item[0]<0 || item[1]<0 || item[2]<0 || item[3]<0) { return false;}
+    if (item[0]>320 || item[1]>240 || item[2]>320 || item[3]>240) { return false;}
     return true;
 }
 function draw_motion() {
@@ -216,7 +276,7 @@ function draw_motion() {
     var img = new Image();
     img.onload = function() { 
         ctx.drawImage(img, 0, 0); 
-        var data = getMotionData();
+        var data = getMotionAreaData();
 	var order=1;
         for (var i in data) {
 	    var item=data[i];

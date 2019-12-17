@@ -6,7 +6,7 @@ import os
 from flask import Flask, render_template, request, jsonify
 import threading
 import subprocess
-from PIL import Image
+from PIL import Image,ImageFilter
 from PyV4L2Camera.camera import Camera
 from PyV4L2Camera.controls import ControlIDs
 
@@ -16,17 +16,28 @@ ratio = 8
 sthres = 1
 thres = ratio * ratio * 255 / 30
 size = width * height
-motion_config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'motion_config')
-lux_config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lux_config')
+
+motion_area_config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'motion_area_config')
+motion_threshold_config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'motion_threshold_config')
+lux_area_config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lux_area_config')
+gauss_filter_config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'gauss_filter_config')
 image_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static/ss.jpg')
-print('motion config path: {}, image path: {}'.format(motion_config_path, image_path))
-print('lux config path: {}, image path: {}'.format(lux_config_path, image_path))
-motion_targets = np.loadtxt(motion_config_path, dtype=int)
-lux_targets = np.loadtxt(lux_config_path, dtype=int)
-motion_rects = np.divide(motion_targets, ratio * 320 / width).astype(int)
-lux_rects = np.divide(lux_targets, ratio * 320 / width).astype(int)
+print('motion area config path: {}'.format(motion_area_config_path))
+print('motion threshold config path: {}'.format(motion_threshold_config_path))
+print('lux area config path: {}'.format(lux_area_config_path))
+print('gauss filter config path: {}'.format(gauss_filter_config_path))
+print('image path: {}'.format(image_path))
+
+motion_targets = np.empty(shape=(4,4), dtype=int)
+motion_thresholds = np.empty(shape=4)
+lux_targets = np.empty(shape=(4,4))
+motion_rects = np.empty(shape=(4,4))
+lux_rects = np.empty(shape=(4,4))
+
+gauss_radius=1
 
 snapping = False
+gaussSnapping = False
 
 # camera
 camera=Camera('/dev/video0', 320, 240)
@@ -39,6 +50,48 @@ last_trigger_times=[0,0,0,0]
 # flask
 app = Flask(__name__)
 
+def loadMotionConfigData():
+    global motion_targets
+    global motion_thresholds
+
+    try:
+        motion_targets = np.loadtxt(motion_area_config_path, dtype=int)
+    except:
+        motion_targets = np.array([[0,0,320,240],[0,0,1,1],[0,0,1,1],[0,0,1,1]])
+
+    try:
+        motion_thresholds = np.loadtxt(motion_threshold_config_path, dtype=int)
+    except:
+        motion_thresholds = np.array([1,1,1,1])
+
+def loadLuxConfigData():
+    global lux_targets
+    try:
+        lux_targets = np.loadtxt(lux_area_config_path, dtype=int)
+    except:
+        lux_targets = np.array([[0,0,320,240],[0,0,1,1],[0,0,1,1],[0,0,1,1]])
+
+def loadGaussFilterConfigData():
+    global gauss_radius
+    try:
+        file=open(gauss_filter_config_path)
+        gauss_radius=int(file.readline())
+        if(gauss_radius<=0):
+            gauss_radius=5
+        if((gauss_radius%2)==0):
+            gauss_radius=5;
+        file.close()
+    except:
+        gauss_radius=5
+
+def dataInit():
+    global motion_rects
+    global lux_rects
+    loadMotionConfigData()
+    loadLuxConfigData()
+    loadGaussFilterConfigData()
+    motion_rects = np.divide(motion_targets, ratio * 320 / width).astype(int)
+    lux_rects = np.divide(lux_targets, ratio * 320 / width).astype(int)
 
 @app.route('/')
 def index():
@@ -77,29 +130,47 @@ def config_lux():
     else:
         return get_lux_config()
 
+@app.route('/gauss_filter_config', methods=['GET', 'POST'])
+def config_gauss_filter():
+    if request.method == 'POST':
+        set_gauss_filter_config(request.json)
+        return ''
+    else:
+        return get_gauss_filter_config()
+
 def set_motion_config(config):
-    if len(config) == 0:
+    if len(config['areas']) == 0:
         return
-    with open(motion_config_path, 'w', encoding='utf-8') as file:
-        for line in config:
+    if len(config['thresholds']) == 0:
+        return
+    with open(motion_area_config_path, 'w+', encoding='utf-8') as file:
+        for line in config['areas']:
             file.write(' '.join(str(x) for x in line) + '\n')
-    global motion_targets
-    motion_targets = np.loadtxt(motion_config_path, dtype=int)
+    with open(motion_threshold_config_path, 'w+', encoding='utf-8') as file:
+        file.write(' '.join(str(x) for x in config['thresholds']))
+    loadMotionConfigData()
 
 def set_lux_config(config):
     if len(config) == 0:
         return
-    with open(lux_config_path, 'w', encoding='utf-8') as file:
+    with open(lux_area_config_path, 'w', encoding='utf-8') as file:
         for line in config:
             file.write(' '.join(str(x) for x in line) + '\n')
-    global lux_targets
-    lux_targets = np.loadtxt(lux_config_path, dtype=int)
+    loadLuxConfigData()
+
+def set_gauss_filter_config(config):
+    with open(gauss_filter_config_path, 'w', encoding='utf-8') as file:
+        file.write(str(config['radius'])) 
+    loadGaussFilterConfigData()
 
 def get_motion_config():
-    return jsonify(motion_targets.tolist())
+    return jsonify({'areas': motion_targets.tolist(), 'thresholds': motion_thresholds.tolist()})
 
 def get_lux_config():
     return jsonify(lux_targets.tolist())
+
+def get_gauss_filter_config():
+    return jsonify({'radius': gauss_radius})
 
 def start_app():
     # run app
@@ -107,6 +178,8 @@ def start_app():
 
 
 def main():
+    dataInit()
+
     t = threading.Thread(name='web', target=start_app)
     t.daemon = True
     t.start()
@@ -121,7 +194,8 @@ def main():
         data = np.empty((width, height), dtype=np.uint8)
         try:
             frame=camera.get_frame()
-            img=Image.frombytes('RGB', (camera.width, camera.height), frame, 'raw', 'RGB').resize((width,height))
+            img=Image.frombytes('RGB', (camera.width, camera.height), frame, 'raw', 'RGB')
+            img=img.filter(ImageFilter.GaussianBlur(radius=gauss_radius))
             img_yuv=img.convert('L')
             data=np.array(img_yuv)
         except IOError as e:
@@ -150,10 +224,16 @@ def main():
 
 def snap():
     global snapping
+    global gaussSnapping
     snapping = True
     time.sleep(2)
     frame=camera.get_frame()
-    img=Image.frombytes('RGB', (camera.width, camera.height), frame, 'raw', 'RGB').resize((320,240))
+    img=Image.frombytes('RGB', (camera.width, camera.height), frame, 'raw', 'RGB')
+    if gaussSnapping:
+        img=img.filter(ImageFilter.GaussianBlur(radius=gauss_radius))
+        gaussSnapping=False
+    else:
+        gaussSnapping=True
     img.save(image_path)
     snapping = False
 
@@ -168,7 +248,10 @@ def judge_light(current):
     for i in range(len(lux_rects)):
         rect = lux_rects[i]
         submatrix = current[rect[1]:rect[3], rect[0]:rect[2]]
-        res[i] = int(np.average(submatrix))
+        try:
+            res[i] = int(np.average(submatrix))
+        except:
+            res[i]=0
 
     with open('/home/pi/motion/fifo', 'w', encoding='utf-8') as file:
         out = json.dumps({'light': res}) + '\n'
@@ -177,6 +260,7 @@ def judge_light(current):
 
 
 def judge_motion(last, current):
+    global motion_thresholds
     # if len(last) != size or len(current) != size:
     #     print('invalid input for judge motion')
     #     return
@@ -198,9 +282,11 @@ def judge_motion(last, current):
     for i in range(len(motion_rects)):
         rect = motion_rects[i]
         submatrix = diff[rect[1]:rect[3], rect[0]:rect[2]]
-        print(submatrix)
+        # print(submatrix)
         current_trigger_time=time.perf_counter()
-        if (np.sum(submatrix) > 0) and (current_trigger_time-last_trigger_times[i]>=5):
+        triggerSum=np.sum(submatrix)
+        print("TRIGGER SUM = "+str(triggerSum)+", TRIGGER THRES SUM = "+str(motion_thresholds[i]))
+        if (triggerSum > motion_thresholds[i]) and (current_trigger_time-last_trigger_times[i]>=3):
             last_trigger_times[i]=current_trigger_time
             res.append(i)
 
